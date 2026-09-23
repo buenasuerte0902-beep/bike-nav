@@ -1,0 +1,9 @@
+.certs/
+tools/.mapillary_token
+data/photos/
+data/graph/_elevation_cache.json
+data/app.db
+data/aerial_tiles/
+models/*.pt
+__pycache__/
+*.pyc

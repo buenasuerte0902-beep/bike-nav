@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1a73e8" />
+<title>自転車ナビ</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="searchBar" class="floating">
+    <button id="menuBtn" class="icon-btn" aria-label="メニュー">☰</button>
+    <input id="destInput" type="text" placeholder="目的地を検索" autocomplete="off" />
+    <div id="searchResults" class="card-list" hidden></div>
+  </div>
+
+  <div id="modeToggle" class="floating segmented">
+    <button data-mode="comfort" class="active">走りやすさ優先</button>
+    <button data-mode="fastest">最短</button>
+  </div>
+
+  <button id="locateBtn" class="fab" aria-label="現在地">◎</button>
+  <button id="contributeBtn" class="fab fab-secondary" aria-label="写真を送る">📷</button>
+  <input id="contributeFile" type="file" accept="image/*" capture="environment" hidden />
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-handle"></div>
+    <div class="sheet-summary">
+      <div class="sheet-total"><span id="totalGrade" class="grade-badge">-</span><span id="sheetDist"></span></div>
+      <button id="closeSheet" class="icon-btn">✕</button>
+    </div>
+    <div id="axisBreakdown" class="axis-grid"></div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/contribute.js"></script>
+</body>
+</html>
