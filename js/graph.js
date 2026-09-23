@@ -51,19 +51,50 @@ function buildAdjacency(data) {
   return { city: data.city, nodes: data.nodes, edges: data.edges, adj };
 }
 
-/** 与えた緯度経度に最も近いグラフのノードIDを返す */
+/**
+ * 与えた緯度経度に最も近い、道路網(edge)上の地点を求め、経路探索の起点/終点として
+ * 使えるノードIDを返す。
+ *
+ * 単純に「最も近いノード(交差点)」を探すと、本当に近い通り沿いの地点よりも、
+ * たまたま近くにある無関係な行き止まり(私道の突き当り等)のノードを拾ってしまい、
+ * 「行き止まりに案内されて途中で切れる」不具合の原因になる。
+ * そのため、まず地図上で最も近いedge(道の線そのもの)を探し、そのedgeの両端点の
+ * うち近い方のノードを採用する。
+ */
 export function nearestNode(graph, lat, lon) {
-  let best = null;
+  const toXY = (la, lo) => {
+    const R = 6371008.8;
+    const rad = Math.PI / 180;
+    return [lo * rad * Math.cos(lat * rad) * R, la * rad * R];
+  };
+  const [px, py] = toXY(lat, lon);
+
   let bestD = Infinity;
-  for (const id in graph.nodes) {
-    const [nlat, nlon] = graph.nodes[id];
-    const d = haversine(lat, lon, nlat, nlon);
-    if (d < bestD) {
-      bestD = d;
-      best = id;
+  let bestEdge = null;
+  for (const edge of graph.edges) {
+    const pts = edge.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, ay] = toXY(pts[i][0], pts[i][1]);
+      const [bx, by] = toXY(pts[i + 1][0], pts[i + 1][1]);
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      if (d < bestD) {
+        bestD = d;
+        bestEdge = edge;
+      }
     }
   }
-  return { id: best, distanceM: bestD };
+  if (!bestEdge) return { id: null, distanceM: Infinity };
+
+  const distFrom = haversine(lat, lon, ...graph.nodes[bestEdge.from]);
+  const distTo = haversine(lat, lon, ...graph.nodes[bestEdge.to]);
+  return distFrom <= distTo
+    ? { id: bestEdge.from, distanceM: distFrom }
+    : { id: bestEdge.to, distanceM: distTo };
 }
 
 export function bounds(graph) {
