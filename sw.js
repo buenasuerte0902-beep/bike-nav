@@ -1,6 +1,6 @@
 // sw.js — オフライン対応。アプリ本体は precache、地図タイルは runtime cache、
 // 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（タイルはオフライン非対応）。
-const VERSION = "bike-nav-v4";
+const VERSION = "bike-nav-v5";
 const SHELL = `${VERSION}-shell`;
 const TILES = `${VERSION}-tiles`;
 const GRAPH = `${VERSION}-graph`;
@@ -15,6 +15,7 @@ const APP_SHELL = [
   "js/map.js",
   "js/app.js",
   "js/contribute.js",
+  "js/gpx.js",
   "vendor/leaflet/leaflet.js",
   "vendor/leaflet/leaflet.css",
   "vendor/leaflet/images/marker-icon.png",

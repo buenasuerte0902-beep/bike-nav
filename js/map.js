@@ -61,6 +61,16 @@ export class MapView {
     if (allPts.length) this.map.fitBounds(L.latLngBounds(allPts), { padding: [60, 200] });
   }
 
+  /** GPXインポートしたルートを描画(ランクデータが無いので単色) */
+  setImportedRoute(points) {
+    this.clearRoute();
+    this._importedLine = L.polyline(
+      points.map((p) => [p[0], p[1]]),
+      { color: "#8e24aa", weight: 5, opacity: 0.85 }
+    ).addTo(this.routeLayer);
+    this.map.fitBounds(this._importedLine.getBounds(), { padding: [60, 200] });
+  }
+
   _edgeTooltip(e) {
     const g = e.grades || {};
     return (

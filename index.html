@@ -17,7 +17,11 @@
     <button id="menuBtn" class="icon-btn" aria-label="メニュー">☰</button>
     <input id="destInput" type="text" placeholder="目的地を検索" autocomplete="off" />
     <div id="searchResults" class="card-list" hidden></div>
+    <div id="menuDropdown" class="card-list" hidden>
+      <div class="result" id="importGpxItem">GPXルートを読み込む</div>
+    </div>
   </div>
+  <input id="gpxFileInput" type="file" accept=".gpx,application/gpx+xml" hidden />
 
   <div id="modeToggle" class="floating segmented">
     <button data-mode="comfort" class="active">走りやすさ優先</button>
@@ -35,6 +39,15 @@
       <button id="closeSheet" class="icon-btn">✕</button>
     </div>
     <div id="axisBreakdown" class="axis-grid"></div>
+  </div>
+
+  <div id="gpxBar" class="sheet" hidden>
+    <div class="sheet-handle"></div>
+    <div class="sheet-summary">
+      <div class="sheet-total"><span id="gpxSummary">-</span></div>
+      <button id="gpxStart" class="icon-btn" aria-label="ナビ開始">▶</button>
+      <button id="closeGpx" class="icon-btn" aria-label="閉じる">✕</button>
+    </div>
   </div>
 
   <div id="toast" class="toast" hidden></div>
