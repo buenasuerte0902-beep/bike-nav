@@ -4,56 +4,121 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1a73e8" />
+<meta name="color-scheme" content="light" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
 <title>自転車ナビ</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></symbol>
+    <symbol id="i-nav" viewBox="0 0 24 24"><path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></symbol>
+  </svg>
+
   <div id="map"></div>
 
-  <div id="searchBar" class="floating">
-    <button id="menuBtn" class="icon-btn" aria-label="メニュー">☰</button>
-    <input id="destInput" type="text" placeholder="目的地を検索" autocomplete="off" />
+  <form id="searchBar" class="floating" role="search" autocomplete="off">
+    <button id="menuBtn" type="button" class="icon-btn" aria-label="メニュー"><svg class="ic"><use href="#i-menu"/></svg></button>
+    <input id="destInput" type="search" enterkeyhint="search" placeholder="目的地を検索" aria-label="目的地を検索" />
+    <button id="clearBtn" type="button" class="icon-btn" aria-label="入力を消す" hidden><svg class="ic"><use href="#i-close"/></svg></button>
+    <button type="submit" class="icon-btn accent" aria-label="検索"><svg class="ic"><use href="#i-search"/></svg></button>
     <div id="searchResults" class="card-list" hidden></div>
-    <div id="menuDropdown" class="card-list" hidden>
-      <div class="result" id="importGpxItem">GPXルートを読み込む</div>
+  </form>
+
+  <div id="navBanner" class="nav-banner" hidden>
+    <svg id="navArrow" class="nav-arrow"><use href="#i-arrow"/></svg>
+    <div class="nav-banner-text">
+      <div id="navMain" class="nav-main"></div>
+      <div id="navSub" class="nav-sub"></div>
     </div>
   </div>
-  <input id="gpxFileInput" type="file" accept=".gpx,application/gpx+xml" hidden />
 
-  <div id="modeToggle" class="floating segmented">
-    <button data-mode="comfort" class="active">走りやすさ優先</button>
-    <button data-mode="fastest">最短</button>
-  </div>
+  <button id="locateBtn" class="fab" aria-label="現在地"><svg class="ic"><use href="#i-locate"/></svg></button>
 
-  <button id="locateBtn" class="fab" aria-label="現在地">◎</button>
-  <button id="contributeBtn" class="fab fab-secondary" aria-label="写真を送る">📷</button>
-  <input id="contributeFile" type="file" accept="image/*" capture="environment" hidden />
-
-  <div id="sheet" class="sheet" hidden>
+  <section id="sheet" class="sheet" hidden aria-live="polite">
     <div class="sheet-handle"></div>
-    <div class="sheet-summary">
-      <div class="sheet-total"><span id="totalGrade" class="grade-badge">-</span><span id="sheetDist"></span></div>
-      <button id="closeSheet" class="icon-btn">✕</button>
+    <div class="place-row">
+      <svg class="ic place-ic"><use href="#i-pin"/></svg>
+      <div class="place-text">
+        <div id="placeName" class="place-name"></div>
+        <div id="placeSub" class="place-sub"></div>
+      </div>
+      <button id="closeSheet" class="icon-btn" aria-label="閉じる"><svg class="ic"><use href="#i-close"/></svg></button>
     </div>
-    <div id="axisBreakdown" class="axis-grid"></div>
-  </div>
+    <div class="origin-row">
+      <span class="origin-label">出発地</span>
+      <button id="originGps" type="button" class="chip">現在地</button>
+      <button id="originPick" type="button" class="chip">地図で指定</button>
+    </div>
+    <div id="routeMsg" class="sheet-msg" hidden></div>
+    <div id="routeCards" class="route-cards"></div>
+    <details id="routeDetail" class="route-detail" hidden>
+      <summary>ルートの詳細</summary>
+      <div id="axisBreakdown" class="axis-grid"></div>
+      <div class="legend">
+        <span>快適</span>
+        <span class="legend-bar"></span>
+        <span>注意</span>
+      </div>
+      <div class="legend-note">線の色は区間ごとの総合ランク(S〜D)。データが無い項目は「-」です。</div>
+    </details>
+    <button id="startNavBtn" class="primary-btn" hidden><svg class="ic"><use href="#i-nav"/></svg>ナビ開始</button>
+  </section>
 
-  <div id="gpxBar" class="sheet" hidden>
+  <section id="gpxBar" class="sheet" hidden>
     <div class="sheet-handle"></div>
-    <div class="sheet-summary">
-      <div class="sheet-total"><span id="gpxSummary">-</span></div>
-      <button id="gpxStart" class="icon-btn" aria-label="ナビ開始">▶</button>
-      <button id="closeGpx" class="icon-btn" aria-label="閉じる">✕</button>
+    <div class="place-row">
+      <svg class="ic place-ic gpx-ic"><use href="#i-upload"/></svg>
+      <div class="place-text">
+        <div id="gpxName" class="place-name"></div>
+        <div id="gpxStats" class="place-sub"></div>
+      </div>
+      <button id="closeGpx" class="icon-btn" aria-label="閉じる"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
+    <button id="gpxStart" class="primary-btn"><svg class="ic"><use href="#i-nav"/></svg>ナビ開始</button>
+  </section>
+
+  <section id="navBar" class="sheet nav-bar" hidden>
+    <div class="nav-stats">
+      <div id="navTime" class="nav-time">-</div>
+      <div id="navMeta" class="nav-meta"></div>
+    </div>
+    <button id="endNavBtn" class="end-btn">終了</button>
+  </section>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <div id="scrim" class="scrim" hidden></div>
+  <aside id="drawer" class="drawer" hidden aria-label="メニュー">
+    <div class="drawer-head">自転車ナビ<span>走りやすさ優先の自転車ルート</span></div>
+    <button id="importGpxItem" class="drawer-item"><svg class="ic"><use href="#i-upload"/></svg>GPXルートを読み込む</button>
+    <button id="legendItem" class="drawer-item"><svg class="ic"><use href="#i-help"/></svg>ランクの見方</button>
+    <button id="aboutItem" class="drawer-item"><svg class="ic"><use href="#i-info"/></svg>データについて</button>
+  </aside>
+  <input id="gpxFileInput" type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden />
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody"></div>
+      <button id="modalClose" class="primary-btn">閉じる</button>
     </div>
   </div>
-
-  <div id="toast" class="toast" hidden></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="js/app.js"></script>
-  <script type="module" src="js/contribute.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ import { haversine } from "./graph.js";
 
 const MAX_POINTS = 2000; // 長時間ライドのGPXは点数が多いので表示・計算負荷対策で間引く
 
-/** GPXファイルの文字列内容から [[lat, lon, ele|null], ...] の点列を取り出す */
+/** GPXファイルの文字列内容から { name, points: [[lat, lon, ele|null], ...] } を取り出す */
 export function parseGpx(text) {
   const doc = new DOMParser().parseFromString(text, "application/xml");
   if (doc.querySelector("parsererror")) throw new Error("GPXの解析に失敗しました");
@@ -24,7 +24,8 @@ export function parseGpx(text) {
     .filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
 
   if (points.length < 2) throw new Error("GPXの座標点が足りません");
-  return decimate(points, MAX_POINTS);
+  const name = (doc.querySelector("trk > name") || doc.querySelector("metadata > name") || doc.querySelector("rte > name"))?.textContent.trim();
+  return { name: name || null, points: decimate(points, MAX_POINTS) };
 }
 
 function decimate(points, maxPoints) {
@@ -44,33 +45,19 @@ export function totalDistanceM(points) {
   return d;
 }
 
+/** 獲得標高。GPSの高度ノイズで水増しされないよう、3m以上の上昇だけを数える */
 export function elevationGainM(points) {
+  const THRESHOLD_M = 3;
   let gain = 0;
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1][2];
-    const b = points[i][2];
-    if (a != null && b != null && b > a) gain += b - a;
+  let ref = null;
+  for (const p of points) {
+    const ele = p[2];
+    if (ele == null) continue;
+    if (ref == null) ref = ele;
+    else if (ele > ref + THRESHOLD_M) {
+      gain += ele - ref;
+      ref = ele;
+    } else if (ele < ref) ref = ele;
   }
   return gain;
-}
-
-/**
- * 現在地(lat, lon)からルート上で最も近い点を探し、そこから終点までの残り距離と、
- * ルートからの逸脱距離を返す(ナビ中の進捗表示・オフルート検知用)。
- */
-export function progressAlongRoute(points, lat, lon) {
-  let bestIdx = 0;
-  let bestD = Infinity;
-  for (let i = 0; i < points.length; i++) {
-    const d = haversine(lat, lon, points[i][0], points[i][1]);
-    if (d < bestD) {
-      bestD = d;
-      bestIdx = i;
-    }
-  }
-  let remainingM = 0;
-  for (let i = bestIdx; i < points.length - 1; i++) {
-    remainingM += haversine(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1]);
-  }
-  return { remainingM, offRouteM: bestD };
 }

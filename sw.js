@@ -1,20 +1,22 @@
 // sw.js — オフライン対応。アプリ本体は precache、地図タイルは runtime cache、
-// 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（タイルはオフライン非対応）。
-const VERSION = "bike-nav-v5";
+// 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（起動のたびに裏で更新確認）。
+const VERSION = "bike-nav-v6";
 const SHELL = `${VERSION}-shell`;
-const TILES = `${VERSION}-tiles`;
-const GRAPH = `${VERSION}-graph`;
+// タイルと道路グラフは容量が大きいのでバージョンを上げても消さない
+const TILES = "bike-nav-tiles";
+const GRAPH = "bike-nav-graph";
 
 const APP_SHELL = [
+  "./",
   "index.html",
   "manifest.webmanifest",
   "css/app.css",
   "js/graph.js",
   "js/route.js",
+  "js/nav.js",
   "js/geocode.js",
   "js/map.js",
   "js/app.js",
-  "js/contribute.js",
   "js/gpx.js",
   "vendor/leaflet/leaflet.js",
   "vendor/leaflet/leaflet.css",
@@ -33,10 +35,11 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("activate", (e) => {
+  const keep = new Set([SHELL, TILES, GRAPH]);
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !keep.has(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -54,33 +57,36 @@ self.addEventListener("fetch", (e) => {
         if (hit) return hit;
         try {
           const res = await fetch(request);
-          cache.put(request, res.clone());
-          trim(cache, 400);
+          if (res.ok) {
+            cache.put(request, res.clone());
+            trim(cache, 400);
+          }
           return res;
         } catch {
-          return hit || Response.error();
+          return Response.error();
         }
       })
     );
     return;
   }
 
-  // 道路グラフ: 一度取得したら自動でオフラインキャッシュに保存
+  // 道路グラフ: キャッシュを即返し、裏で更新(次回起動から新データ)。無ければ取得して保存
   if (url.origin === location.origin && url.pathname.includes("/data/graph/")) {
     e.respondWith(
       (async () => {
-        const hit = await caches.match(request);
-        if (hit) return hit;
-        try {
-          const res = await fetch(request);
-          if (res.ok) {
-            const cache = await caches.open(GRAPH);
-            cache.put(request, res.clone());
-          }
-          return res;
-        } catch {
-          return hit || Response.error();
+        const cache = await caches.open(GRAPH);
+        const hit = await cache.match(request);
+        const refresh = fetch(request)
+          .then((res) => {
+            if (res.ok) cache.put(request, res.clone());
+            return res;
+          })
+          .catch(() => null);
+        if (hit) {
+          e.waitUntil(refresh);
+          return hit;
         }
+        return (await refresh) || Response.error();
       })()
     );
     return;
@@ -88,21 +94,29 @@ self.addEventListener("fetch", (e) => {
 
   // 外部API（Nominatim等）: network-first、失敗時のみキャッシュ
   if (url.origin !== location.origin) {
-    e.respondWith(fetch(request).catch(() => caches.match(request)));
+    e.respondWith(fetch(request).catch(() => caches.match(request).then((r) => r || Response.error())));
     return;
   }
 
-  // アプリ本体: cache-first、更新はバックグラウンド
+  // アプリ本体: cache-first、更新はバックグラウンド。画面遷移は index.html に落とす
   e.respondWith(
-    caches.match(request).then((hit) => {
+    (async () => {
+      const cache = await caches.open(SHELL);
+      const hit =
+        (await cache.match(request, { ignoreSearch: true })) ||
+        (request.mode === "navigate" ? await cache.match("index.html") : undefined);
       const net = fetch(request)
         .then((res) => {
-          caches.open(SHELL).then((c) => c.put(request, res.clone()));
+          if (res.ok) cache.put(request, res.clone());
           return res;
         })
-        .catch(() => hit);
-      return hit || net;
-    })
+        .catch(() => hit || Response.error());
+      if (hit) {
+        e.waitUntil(net);
+        return hit;
+      }
+      return net;
+    })()
   );
 });
 
