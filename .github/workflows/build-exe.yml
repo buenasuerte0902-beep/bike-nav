@@ -1,0 +1,56 @@
+name: Build Windows exe
+
+on:
+  push:
+    paths:
+      - "capture_producer.py"
+      - "inference_consumer.py"
+      - "main_runner.py"
+      - "requirements.txt"
+      - ".github/workflows/build-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 推論はまだダミー（乱数）で torch を使っていないため、exe には含めない。
+      # torch を入れると exe が数GBになるので、本物のモデルを組み込む時に見直す。
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyautogui keyboard watchdog pandas pillow pyinstaller
+
+      - name: Build exe
+        run: >
+          pyinstaller --onefile --name CycleVision
+          --collect-submodules watchdog
+          main_runner.py
+
+      # 起動してキャプチャと推論が1件以上記録されることを確認する
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force smoke | Out-Null
+          Copy-Item dist/CycleVision.exe smoke/
+          $p = Start-Process -FilePath smoke/CycleVision.exe -WorkingDirectory smoke -PassThru `
+            -RedirectStandardOutput smoke/stdout.log -RedirectStandardError smoke/stderr.log
+          Start-Sleep -Seconds 20
+          Get-Content smoke/stdout.log, smoke/stderr.log
+          Get-ChildItem smoke -Recurse | Select-Object FullName
+          Stop-Process -Id $p.Id -Force
+          Get-Process CycleVision -ErrorAction SilentlyContinue | Stop-Process -Force
+          $rows = (Get-Content smoke/output/results.csv | Measure-Object -Line).Lines - 1
+          Write-Host "results.csv rows: $rows"
+          if ($rows -lt 1) { throw "推論結果が記録されませんでした" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CycleVision-windows
+          path: dist/CycleVision.exe

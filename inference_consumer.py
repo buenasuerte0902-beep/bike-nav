@@ -2,9 +2,10 @@ import os
 import time
 import shutil
 import datetime
+import threading
 import pandas as pd
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
 WATCH_DIR = "input_images"
 PROCESSED_DIR = "processed_images"
@@ -27,12 +28,22 @@ def run_inference(filepath):
     return shoulder_width_score, has_white_line, step_risk
 
 class ImageHandler(FileSystemEventHandler):
+    def __init__(self):
+        super().__init__()
+        # 起動時の取り込みと監視イベントで同じ画像を二重に処理しないための記録
+        self._lock = threading.Lock()
+        self._seen = set()
+
     def on_created(self, event):
         if event.is_directory or not event.src_path.lower().endswith(".png"):
             return
             
         filepath = event.src_path
         filename = os.path.basename(filepath)
+        with self._lock:
+            if filename in self._seen:
+                return
+            self._seen.add(filename)
         time.sleep(0.5) 
         
         try:
@@ -63,6 +74,11 @@ def main():
     observer = Observer()
     observer.schedule(event_handler, WATCH_DIR, recursive=False)
     observer.start()
+    
+    # 監視開始前から input_images/ に残っている画像も処理する
+    # （前回の取り残しや、Consumer の起動より先に Producer が保存した画像）
+    for name in sorted(os.listdir(WATCH_DIR)):
+        event_handler.on_created(FileCreatedEvent(os.path.join(WATCH_DIR, name)))
     
     try:
         while True:
