@@ -7,3 +7,13 @@ data/aerial_tiles/
 models/*.pt
 __pycache__/
 *.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# パイプラインの実行結果
+input_images/*.png
+processed_images/*.png
+output/results.csv
