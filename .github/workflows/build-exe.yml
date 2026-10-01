@@ -44,8 +44,9 @@ jobs:
           Start-Sleep -Seconds 20
           Get-Content smoke/stdout.log, smoke/stderr.log
           Get-ChildItem smoke -Recurse | Select-Object FullName
-          Stop-Process -Id $p.Id -Force
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           Get-Process CycleVision -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not (Test-Path smoke/output/results.csv)) { throw "results.csv が作られませんでした" }
           $rows = (Get-Content smoke/output/results.csv | Measure-Object -Line).Lines - 1
           Write-Host "results.csv rows: $rows"
           if ($rows -lt 1) { throw "推論結果が記録されませんでした" }

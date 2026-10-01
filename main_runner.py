@@ -4,6 +4,12 @@ import signal
 import sys
 import time
 
+# 出力先がファイルやパイプのとき、Windows の既定の文字コード（cp1252 など）では
+# 日本語を表示できずに落ちるので UTF-8 にそろえる（子プロセスでもこの行が実行される）
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and not _stream.isatty():
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # exe化（PyInstaller）した場合は exe の置き場所を作業フォルダにする。
 # input_images / processed_images / output は exe の横に作られる。
 if getattr(sys, "frozen", False):
