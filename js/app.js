@@ -1,12 +1,12 @@
 // app.js — 画面の結線。検索・出発地/目的地・候補ルート・ナビ(案内)・GPXインポート。
-import { loadGraph, snapToRoad, bounds } from "./graph.js";
+import { loadGraph, loadCityIndex, buildAdjacency, snapToRoad, haversine } from "./graph.js";
+import { buildAreaGraph, corridor, pointInPoly, MAX_STRAIGHT_KM } from "./osmgraph.js";
 import { findRoute, scoreToGrade, MODE_LABEL } from "./route.js";
 import { searchPlace } from "./geocode.js";
 import { MapView } from "./map.js";
 import { parseGpx, totalDistanceM, elevationGainM } from "./gpx.js";
 import { buildNav, locate, describeTurn, formatDistance, formatDuration, formatClock } from "./nav.js";
 
-const CITY = "金沢市";
 const DEFAULT_CENTER = [36.5613, 136.6562];
 const RECENT_KEY = "bikeNavRecent";
 const OUT_OF_AREA_M = 1500; // 道路データからこれ以上離れた地点はエリア外とみなす
@@ -29,8 +29,10 @@ const els = Object.fromEntries(
 );
 
 const state = {
-  graph: null,
-  viewbox: null,
+  graph: null, // いまのルートに使っている道路グラフ(事前構築の都市 or その場で作った周辺グラフ)
+  cityIndex: loadCityIndex(), // Promise<[{city, bbox}]>
+  graphAbort: null,
+  progress: null,
   origin: null, // {lat, lon, kind: "gps" | "map"}
   destination: null, // {lat, lon, name, sub}
   routes: [],
@@ -67,16 +69,6 @@ async function init() {
     }
   } catch {}
 
-  toast("道路データを読み込み中…", 60000);
-  try {
-    state.graph = await loadGraph(CITY);
-    const b = bounds(state.graph);
-    state.viewbox = [b.west, b.north, b.east, b.south];
-    hideToast();
-    if (state.destination && state.origin) computeRoutes();
-  } catch {
-    toast(`${CITY}の道路データを読み込めませんでした。通信状況を確認してください`, 8000);
-  }
 }
 
 function bindUi() {
@@ -202,7 +194,9 @@ async function runSearch(query) {
   state.searchAbort = ctrl;
   showListNote("検索中…");
   try {
-    const results = await searchPlace(query, { viewbox: state.viewbox, signal: ctrl.signal });
+    const b = mapView.map.getBounds();
+    const viewbox = [b.getWest(), b.getNorth(), b.getEast(), b.getSouth()];
+    const results = await searchPlace(query, { viewbox, signal: ctrl.signal });
     if (!results.length) return showListNote("見つかりませんでした。別のキーワードをお試しください");
     renderPlaceList(results, "i-pin");
   } catch (err) {
@@ -288,6 +282,7 @@ function clearDestination() {
   state.routeError = null;
   state.pickingOrigin = false;
   state.reqId++;
+  state.graphAbort?.abort();
   mapView.clearDestination();
   mapView.clearRoute();
   els.destInput.value = "";
@@ -338,15 +333,58 @@ function getPosition() {
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
+const nearRoad = (g, p) => (snapToRoad(g, p.lat, p.lon)?.distanceM ?? Infinity) <= OUT_OF_AREA_M;
+const inBbox = ([s, w, n, e], p) => p.lat >= s && p.lat <= n && p.lon >= w && p.lon <= e;
+
+/** a,b 両方を含む道路グラフを返す。事前構築済みの都市を優先し、無ければ周辺の道路をその場で取得して作る */
+async function graphFor(a, b, signal, onProgress) {
+  const g = state.graph;
+  const covers = (p) => (g.area ? pointInPoly(p.lat, p.lon, g.area) : true) && nearRoad(g, p);
+  if (g && covers(a) && covers(b)) return g;
+
+  for (const c of await state.cityIndex) {
+    if (!inBbox(c.bbox, a) || !inBbox(c.bbox, b)) continue;
+    onProgress(`${c.city}の道路データを読み込み中…`);
+    const cg = await loadGraph(c.city);
+    if (nearRoad(cg, a) && nearRoad(cg, b)) return cg;
+  }
+
+  const km = haversine(a.lat, a.lon, b.lat, b.lon) / 1000;
+  if (km > MAX_STRAIGHT_KM)
+    throw new Error(`出発地と目的地が離れすぎています(直線${Math.round(km)}km)。${MAX_STRAIGHT_KM}km以内で指定してください`);
+  return buildAdjacency(await buildAreaGraph(corridor(a, b), { signal, onProgress }));
+}
+
 async function computeRoutes() {
   if (!state.destination || !state.origin) return;
-  if (!state.graph) {
-    toast("道路データを読み込み中です。完了後に自動でルートを探します", 4000);
+  const id = ++state.reqId;
+  state.graphAbort?.abort();
+  const ctrl = new AbortController();
+  state.graphAbort = ctrl;
+  state.computing = true;
+  state.progress = null;
+  state.routeError = null;
+  renderSheet();
+  await nextFrame();
+  if (id !== state.reqId) return;
+
+  try {
+    state.graph = await graphFor(state.origin, state.destination, ctrl.signal, (msg) => {
+      if (id !== state.reqId) return;
+      state.progress = msg;
+      renderSheet();
+    });
+  } catch (err) {
+    if (err.name === "AbortError" || id !== state.reqId) return;
+    state.computing = false;
+    state.routes = [];
+    state.routeError = err.message || "道路データを取得できませんでした";
+    renderSheet();
+    drawRoutes(false);
     return;
   }
-  const id = ++state.reqId;
-  state.computing = true;
-  state.routeError = null;
+  if (id !== state.reqId) return;
+  state.progress = "ルートを計算中…";
   renderSheet();
   await nextFrame();
   if (id !== state.reqId) return;
@@ -357,7 +395,7 @@ async function computeRoutes() {
   let error = null;
   if (!from || !to) error = "近くに道路データが見つかりません";
   else if (from.distanceM > OUT_OF_AREA_M || to.distanceM > OUT_OF_AREA_M)
-    error = `${CITY}の道路データの範囲外です。${CITY}内の場所を指定してください`;
+    error = "出発地か目的地が自転車で走れる道路から離れすぎています。道路の近くを指定してください";
   else {
     for (const mode of ["comfort", "fastest"]) {
       const r = findRoute(state.graph, from, to, mode);
@@ -411,7 +449,7 @@ function renderSheet() {
   msg.classList.remove("busy");
   msg.hidden = false;
   if (state.computing) {
-    msg.textContent = "ルートを検索中…";
+    msg.textContent = state.progress || "ルートを検索中…";
     msg.classList.add("busy");
   } else if (state.routeError) {
     msg.textContent = state.routeError;
@@ -578,17 +616,28 @@ function updateNav(lat, lon, accuracy) {
   }
 }
 
-function onOffRoute(n, lat, lon) {
+async function onOffRoute(n, lat, lon) {
   const now = Date.now();
-  if (now - n.lastAction < 12000) return;
+  if (n.rerouting || now - n.lastAction < 12000) return;
   n.lastAction = now;
   if (n.kind !== "app" || !state.graph) {
     toast("ルートから外れています");
     return;
   }
-  const from = snapToRoad(state.graph, lat, lon);
-  const to = snapToRoad(state.graph, state.destination.lat, state.destination.lon);
-  const route = from && to ? findRoute(state.graph, from, to, n.route.mode) : null;
+  let route = null;
+  n.rerouting = true;
+  try {
+    const graph = await graphFor({ lat, lon }, state.destination, undefined, () => toast("周辺の道路データを取得して再検索中…", 8000));
+    if (state.nav !== n) return;
+    state.graph = graph;
+    const from = snapToRoad(graph, lat, lon);
+    const to = snapToRoad(graph, state.destination.lat, state.destination.lon);
+    route = from && to ? findRoute(graph, from, to, n.route.mode) : null;
+  } catch {
+  } finally {
+    n.rerouting = false;
+  }
+  if (state.nav !== n) return;
   if (!route) {
     toast("ルートから外れています");
     return;
@@ -733,11 +782,12 @@ const LEGEND_HTML = `
   <p>所要時間は平地17km/hを基準に、上りは遅く・下りは速く見積もった目安です。</p>`;
 
 const ABOUT_HTML = `
-  <p>走りやすさ優先の自転車ナビです。現在は${CITY}のみ対応しています。</p>
+  <p>走りやすさ優先の自転車ナビです。日本全国で使えます(出発地と目的地は直線${MAX_STRAIGHT_KM}km以内)。</p>
+  <p>金沢市は道路データを事前に詳しく解析済みです(路肩幅・交通量の実測などを反映)。それ以外の地域は、ルート検索のたびに周辺の道路データを取得し、自転車帯・道路の種類・信号・起伏から評価します(路肩幅は「-」)。</p>
   <ul>
-    <li>地図・道路: © OpenStreetMap contributors</li>
-    <li>交通量: 国土交通省 道路交通センサス</li>
-    <li>路肩幅の推定: 国土地理院の空中写真、Mapillaryの街路写真をオフラインで解析</li>
-    <li>標高: 国土地理院</li>
+    <li>地図・道路: © OpenStreetMap contributors (Overpass API)</li>
+    <li>交通量: 国土交通省 道路交通センサス(金沢市)</li>
+    <li>路肩幅の推定: 国土地理院の空中写真、Mapillaryの街路写真をオフラインで解析(金沢市)</li>
+    <li>標高: 国土地理院 標高タイル</li>
   </ul>
   <p>ランクは推定を含みます。実際の道路状況・交通ルールを優先し、安全に走行してください。</p>`;

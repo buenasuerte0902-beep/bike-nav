@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>路面ラベリング</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="/label.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <aside id="panel">
+    <header class="bar">
+      <select id="citySel" aria-label="都市"></select>
+      <button id="requeue" type="button" title="いま地図に表示している範囲だけで並べ直す">この範囲で並べ直す</button>
+      <button id="layerBtn" type="button" title="M">地図/航空写真</button>
+    </header>
+    <div id="progress" class="progress"></div>
+
+    <section class="info">
+      <div><b id="hw">-</b> <span id="len"></span></div>
+      <div id="guess" class="muted"></div>
+    </section>
+
+    <section class="viewer">
+      <canvas id="pano" width="480" height="300" hidden></canvas>
+      <img id="photo" alt="" hidden />
+      <div id="noPhoto" class="no-photo">この区間には手元の写真がありません。<br />航空写真(左)や Street View ボタンで確認してください。</div>
+      <div id="photoCap" class="muted cap"></div>
+      <div id="thumbs" class="thumbs"></div>
+    </section>
+
+    <section class="pad">
+      <div class="row-label">路肩の広さ <span class="muted">キー 1-5 / - でわからない</span></div>
+      <div id="rowSh" class="grades"></div>
+      <div class="row-label">路面の滑らかさ <span class="muted">キー 1-5 / - でわからない</span></div>
+      <div id="rowSm" class="grades"></div>
+      <div id="pending" class="muted pending"></div>
+    </section>
+
+    <section class="actions">
+      <button id="svBtn" type="button" title="G">Street View ↗</button>
+      <button id="skipBtn" type="button" title="Space">スキップ</button>
+      <button id="backBtn" type="button" title="Backspace">戻る</button>
+      <button id="clearBtn" type="button" title="Delete">判定を消す</button>
+    </section>
+    <label class="sync"><input id="svSync" type="checkbox" /> 区間が変わるたびに Street View の別ウィンドウを同じ位置へ切り替える(見て判定するのは人間)</label>
+    <section class="actions">
+      <button id="mergeBtn" type="button" class="primary">判定をグラフに反映</button>
+    </section>
+    <div class="keys muted">
+      1-5 = S A B C D ・ 順に「路肩→路面」の2回押しで次へ ・ - = わからない ・ Enter = 片方だけで確定 ・
+      Space = スキップ ・ Backspace = 戻る ・ ←/→ = 写真切替 ・ V = 写真を反対向きに ・ G = Street View ・ M = 地図切替
+    </div>
+  </aside>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/label.js"></script>
+</body>
+</html>

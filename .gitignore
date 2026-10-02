@@ -7,3 +7,7 @@ data/aerial_tiles/
 models/*.pt
 __pycache__/
 *.pyc
+
+# Google Street View API key
+tools/.streetview_key
+data/streetview_scores/

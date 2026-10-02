@@ -1,6 +1,6 @@
 // sw.js — オフライン対応。アプリ本体は precache、地図タイルは runtime cache、
 // 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（起動のたびに裏で更新確認）。
-const VERSION = "bike-nav-v6";
+const VERSION = "bike-nav-v7";
 const SHELL = `${VERSION}-shell`;
 // タイルと道路グラフは容量が大きいのでバージョンを上げても消さない
 const TILES = "bike-nav-tiles";
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "manifest.webmanifest",
   "css/app.css",
   "js/graph.js",
+  "js/osmgraph.js",
   "js/route.js",
   "js/nav.js",
   "js/geocode.js",
@@ -49,8 +50,8 @@ self.addEventListener("fetch", (e) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
 
-  // 地図タイル: cache-first + 上限
-  if (/tile\.openstreetmap\.org|tile\..*\/\d+\/\d+\/\d+\.png/.test(url.href)) {
+  // 地図タイル・標高タイル: cache-first + 上限
+  if (/tile\.openstreetmap\.org|tile\..*\/\d+\/\d+\/\d+\.png|cyberjapandata\.gsi\.go\.jp\/xyz\/dem_png\//.test(url.href)) {
     e.respondWith(
       caches.open(TILES).then(async (cache) => {
         const hit = await cache.match(request);

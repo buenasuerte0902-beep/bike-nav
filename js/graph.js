@@ -34,7 +34,17 @@ export async function loadGraph(city) {
   return cached;
 }
 
-function buildAdjacency(data) {
+/** 事前構築済みの都市一覧 data/graph/index.json ([{city, bbox:[s,w,n,e]}]) */
+export async function loadCityIndex() {
+  try {
+    const res = await fetch("data/graph/index.json");
+    return res.ok ? await res.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+export function buildAdjacency(data) {
   const adj = new Map(); // nodeId -> [{edge, to, forward}]
   for (const id of Object.keys(data.nodes)) adj.set(id, []);
   for (const e of data.edges) {
@@ -57,7 +67,7 @@ function buildAdjacency(data) {
     adj.get(e.from).push({ edge: e, to: e.to, forward: true });
     adj.get(e.to).push({ edge: e, to: e.from, forward: false });
   }
-  return { city: data.city, nodes: data.nodes, edges: data.edges, adj };
+  return { city: data.city, area: data.area || null, nodes: data.nodes, edges: data.edges, adj };
 }
 
 /**

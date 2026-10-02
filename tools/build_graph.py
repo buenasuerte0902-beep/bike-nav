@@ -395,12 +395,34 @@ def composite(grades):
     return "D"
 
 
+def update_index():
+    """アプリが「事前構築済みの都市」を探すための data/graph/index.json を作り直す。
+    それ以外の地域はアプリがその場で周辺の道路を取得する(js/osmgraph.js)。"""
+    index = []
+    for name in sorted(os.listdir(GRAPH_DIR)):
+        if not name.endswith(".json") or name.startswith("_") or name == "index.json":
+            continue
+        with open(os.path.join(GRAPH_DIR, name), encoding="utf-8") as f:
+            g = json.load(f)
+        lats = [p[0] for p in g["nodes"].values()]
+        lons = [p[1] for p in g["nodes"].values()]
+        index.append({"city": name[:-5], "bbox": [min(lats), min(lons), max(lats), max(lons)]})
+    path = os.path.join(GRAPH_DIR, "index.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=1)
+    os.replace(path + ".tmp", path)
+    print(f"index.json 更新: {', '.join(c['city'] for c in index)}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="市区町村の自転車ルーティング用グラフを構築")
     ap.add_argument("--city", default="金沢市")
     ap.add_argument("--no-elevation", action="store_true", help="標高APIを叩かない(勾配は評価しない)")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--index-only", action="store_true", help="data/graph/index.json だけ作り直す")
     args = ap.parse_args()
+    if args.index_only:
+        return update_index()
 
     os.makedirs(GRAPH_DIR, exist_ok=True)
     out_path = os.path.join(GRAPH_DIR, f"{args.city}.json")
@@ -494,6 +516,7 @@ def main():
     os.replace(tmp_path, out_path)  # 書き込み中の中断でファイルが壊れないよう一時ファイル経由にする
     size_mb = os.path.getsize(out_path) / 1e6
     print(f"完了: {out_path} ({len(out_nodes)} nodes / {len(out_edges)} edges, {size_mb:.2f}MB)")
+    update_index()
 
 
 if __name__ == "__main__":

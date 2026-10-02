@@ -10,13 +10,14 @@
 
 バニラJS + ESモジュールのPWA。ビルド無し（curve-assistと同じ方針）。
 
-- `index.html` / `js/{graph,route,nav,gpx,geocode,map,app}.js` / `css/app.css` / `sw.js`
+- `index.html` / `js/{graph,osmgraph,route,nav,gpx,geocode,map,app}.js` / `css/app.css` / `sw.js`
 - `vendor/leaflet` — 同梱（オフラインPWAのためCDN不使用）
 - `tools/build_graph.py` — OSMから道路網を取得しランク付けしてグラフJSONを書き出す
 - `tools/fetch_mapillary_images.py` — Mapillaryから学習用の道路写真を収集する
 - `tools/ml/{detect_vehicles,estimate_shoulder_width,segment_road,equirect,imutil,label_smoothness,train_smoothness,apply_ml_scores}.py`
   — Phase4(写真ベースのML、詳細は下記)
 - `tools/label_via_streetview.py` — Street Viewを見た手動判定でラベル付け（自動取得はしない、詳細は下記）
+- `tools/label_server.py` + `tools/label/` — 任意の都市で使うブラウザ版ラベリングツール（詳細は下記）
 - `tools/fetch_traffic_census.py` / `tools/apply_traffic_census.py` — 国交省・道路交通センサスの
   実測交通量を取得しグラフに反映（詳細は下記）
 - `tools/ml/{aerial,apply_aerial_width}.py` — 国土地理院の航空写真から道路脇の舗装帯幅を推定
@@ -44,6 +45,14 @@ python serve.py --tls --lan     # https://<LAN-IP>:8444 （スマホのGPSテス
 python tools/build_graph.py --city 金沢市              # 標高込み(勾配ランクあり)
 python tools/build_graph.py --city 金沢市 --no-elevation  # 標高APIを叩かず高速に試す
 ```
+
+**全国対応**: アプリは日本全国で使える。出発地と目的地が両方とも事前構築した都市
+（`data/graph/index.json` に載っている都市。`build_graph.py` 実行時に自動更新、
+`--index-only` で作り直し）の中ならそのグラフを使い、それ以外は `js/osmgraph.js` が
+2点を囲む帯状の範囲（幅は距離に応じて1.5〜4km）の道路をOverpassから取り、国土地理院の
+標高タイル(dem_png)で勾配を付けて、`build_graph.py` と同じ基準でその場でランク付けする。
+直線30kmまで。一度取った範囲の中での再検索・リルートは再取得しない。事前構築は
+「路肩幅・交通量の実測などを詳しく入れたい都市」だけ行えばよい。
 
 Overpass APIとOpen-Elevation APIを叩く。Open-Elevationの公開デモサーバーは
 不安定・低速なことがあるため、`--no-elevation` でまず動作確認してから
@@ -176,6 +185,52 @@ python tools/label_via_streetview.py --city 金沢市 --merge       # 判定結�
 `grades.shoulderWidth` / `grades.smoothness` に反映される（`tools/ml/apply_ml_scores.py`
 のML推定結果を、後から手動判定で上書きすることも可能）。
 
+### ラベリングツール(ブラウザ版, `tools/label_server.py`)
+
+上のコマンドライン版より速く判定するためのローカルWebツール。`data/graph/` にある
+**どの都市でも**使える（`python tools/build_graph.py --city 〇〇市` で作った都市が選択肢に出る）。
+
+```
+python tools/label_server.py     # http://127.0.0.1:8795 (このPCからのみアクセス可)
+```
+
+- 道路を「同じ道・約200mごとの区間」にまとめ、幹線 → 住宅街 → 私道の順で出題。
+  初期範囲は都市内で道路が最も密な場所（市街地）。地図を動かして「この範囲で並べ直す」で
+  好きな場所に切り替えられる。
+- 左に国土地理院の航空写真(Mキーで地図に切替)、右に手元のMapillary写真
+  （全天球は道の向きに合わせて表示、ドラッグで回転）。写真が無い区間は航空写真か
+  「Street View ↗」ボタン（普通のGoogle Maps URLを開くだけ）で確認。
+- 「区間が変わるたびに Street View の別ウィンドウを切り替える」にチェックすると、判定を
+  進めるたびに別ウィンドウの Street View が同じ位置へ移る（普通のGoogle Maps URLを開くだけ。
+  画像の取得・保存・読み取りはしない。見て判定するのは人間）。ポップアップの許可が必要。
+- 1区間 = キー2回（路肩 1-5 → 路面 1-5 = S〜D、`-` はわからない）で保存して次へ。
+  Space=スキップ / Backspace=戻る / Delete=判定を消す。1区間の判定は区間内の全辺に適用。
+- 保存先は `data/manual_labels/<city>.json`（即時保存）。「判定をグラフに反映」で
+  `--merge` と同じ処理を実行。路面の滑らかさは、近くに写真がある区間なら
+  `data/photos/<city>/_labels_smoothness.json` にも書き、`tools/ml/train_smoothness.py`
+  の学習データになる。
+- 航空写真の自動推定やMLの結果より手動判定を優先したいので、`apply_aerial_width.py` /
+  `apply_ml_scores.py` を再実行した後は、もう一度「グラフに反映」を押すこと。
+
+### Street View Static API(公式API)での路肩幅推定(`tools/fetch_streetview_scores.py`)
+
+自分のGoogle Maps Platform APIキーで、区間ごとに Street View の画像を取得し、**メモリ上で**
+路肩幅を推定（`tools/ml/estimate_shoulder_width.py` の車を物差しにした幾何推定）して、
+**数値だけ**を `data/streetview_scores/<city>.json` に保存する。**画像はディスクに保存せず、
+MLの学習にも使わない**（Google側の利用規約のコンテンツ保存・再利用の制限に配慮。商用化前に
+最新の規約と料金を必ず自分で確認すること）。
+
+```
+# キーは環境変数 GOOGLE_MAPS_API_KEY か tools/.streetview_key(gitignore済み)に置く
+python tools/fetch_streetview_scores.py --city 金沢市 --dry-run   # 件数と概算費用だけ(API呼び出しなし)
+python tools/fetch_streetview_scores.py --city 金沢市 --limit 30  # まず30区間で精度を確認
+python tools/fetch_streetview_scores.py --city 金沢市 --apply     # 結果をグラフに反映
+```
+
+- 手動ラベル済みの区間は取得も上書きもしない(手動が最優先)。`--max-images`(既定3000枚)で自動停止。
+- 車が写っていない区間は推定不能(`no_vehicle`)になる。結果は必ず手動ラベルと比較して精度を確かめてから使うこと。
+- メタデータ取得(撮影日・panoId)は無料、画像取得が有料。APIキーにはAPI制限と予算アラートを付けておく。
+
 ## ユーザー投稿バックエンド（`server/`）
 
 走行中に撮った写真をアプリから直接送れる機能。**Mapillaryには公開投稿せず、
@@ -261,7 +316,9 @@ python server/app.py --tls --lan    # https://<LAN-IP>:8779 (スマホ実機テ�
   登録有無に関係なく正常に動作する(curl・ブラウザ双方でエンドツーエンド確認済み)。
 - 地図タイルはオフライン非対応（`data/graph/`のデータ自体はService Workerで
   自動キャッシュされ、オフラインでもルート計算はできる）
-- 対応エリアは今のところ金沢市のみ（`tools/build_graph.py --city <市区町村名>`で
-  他エリアも生成できるが、`js/app.js`の`CITY`定数を変更する必要あり）
+- 事前構築していない地域では、ルート検索のたびに公開Overpassサーバーへ問い合わせる
+  （東京駅〜新宿駅で約15秒）。公開サーバーは利用制限があるため、商用でユーザーが増えたら
+  自前のOverpassサーバーか、全国を事前にタイル分割したグラフ配信に切り替えること。
+  またその場で作るグラフは路肩幅・路面の滑らかさ・交通量の実測が無い（OSMタグからの近似のみ）
 - `nearestNode()`は全ノード総当たりの線形探索（都市規模なら実用上問題ない速さだが、
   複数都市を1グラフに束ねる場合は空間インデックスが必要になる）
