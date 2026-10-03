@@ -265,3 +265,16 @@ python server/app.py --tls --lan    # https://<LAN-IP>:8779 (スマホ実機テ�
   他エリアも生成できるが、`js/app.js`の`CITY`定数を変更する必要あり）
 - `nearestNode()`は全ノード総当たりの線形探索（都市規模なら実用上問題ない速さだが、
   複数都市を1グラフに束ねる場合は空間インデックスが必要になる）
+
+## CycleVision.exe（取り込み＆推論パイプライン）
+
+`main_runner.py` を GitHub Actions（`.github/workflows/build-exe.yml`）で単一の Windows exe にしたもの。
+初回起動で exe の横に `config.json` が作られ、`source` で画像の取り込み元を選ぶ。
+
+- `"screen"`（既定）: 画面キャプチャ。`screen.auto` が false ならホットキー（既定 `ctrl+space`）を押した時だけ撮る
+- `"mapillary"`: `mapillary.bbox` の範囲の Mapillary 公開画像を取り込む（`mapillary.access_token` に Client Token を設定）
+
+推論結果は `output/results.csv` と `output/results.db`（SQLite, `results` テーブル）の両方に追記され、
+Mapillary 画像は緯度経度も記録される。処理済みの画像と付随情報（.json）は `processed_images/` へ移る。
+Google マップ／Street View の画面を自動操作して撮りためる取り込み元は、Google マップ利用規約
+（3.3 大量ダウンロードの禁止、3.4 地図・ナビ用データセットの作成禁止）に当たるため用意していない。
