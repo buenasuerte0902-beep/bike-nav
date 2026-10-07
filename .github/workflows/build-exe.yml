@@ -8,6 +8,7 @@ on:
       - "main_runner.py"
       - "app_config.py"
       - "mapillary_source.py"
+      - "googlemaps_source.py"
       - "requirements.txt"
       - ".github/workflows/build-exe.yml"
   workflow_dispatch:
@@ -27,13 +28,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyautogui keyboard watchdog pillow pyinstaller
+          pip install pyautogui keyboard watchdog pillow selenium pyinstaller
 
       - name: Build exe
         run: >
           pyinstaller --onefile --name CycleVision
           --collect-submodules watchdog
           --hidden-import mapillary_source
+          --hidden-import googlemaps_source
+          --collect-all selenium
           main_runner.py
 
       # 起動してキャプチャと推論が1件以上記録されることを確認する

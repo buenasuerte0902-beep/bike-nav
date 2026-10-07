@@ -4,3 +4,4 @@ watchdog
 torch
 torchvision
 pillow
+selenium

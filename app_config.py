@@ -6,7 +6,8 @@ import os
 CONFIG_FILE = "config.json"
 
 DEFAULT_CONFIG = {
-    # 画像の取り込み元: "screen"（画面キャプチャ） または "mapillary"（Mapillary 公開画像）
+    # 画像の取り込み元: "screen"（画面キャプチャ）、"mapillary"（Mapillary 公開画像）、
+    # "googlemaps"（Googleマップの Street View をブラウザで自動撮影。利用規約 3.3/3.4 に当たるので自己責任）
     "source": "screen",
     "screen": {
         # true なら interval_sec ごとに自動で撮る。false ならホットキーを押した時だけ撮る
@@ -22,6 +23,20 @@ DEFAULT_CONFIG = {
         "bbox": [136.640, 36.570, 136.660, 36.585],
         "max_images": 200,
         "delay_sec": 1.0,
+    },
+    "googlemaps": {
+        # 撮影するルート [[緯度, 経度], ...]。step_m ごとに区切って Street View を開く（既定は金沢駅→香林坊）
+        "route": [[36.5781, 136.6480], [36.5700, 136.6530], [36.5615, 136.6560]],
+        "step_m": 50,
+        # 進行方向に対する撮影の向き（度）。0 = 前方
+        "headings": [0],
+        "pitch": -10,
+        "fov": 90,
+        # "edge" または "chrome"（PC にインストール済みのものを使う）
+        "browser": "edge",
+        "window_size": [1280, 800],
+        "load_wait_sec": 4,
+        "interval_sec": 3,
     },
 }
 

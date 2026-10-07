@@ -69,8 +69,12 @@ def main():
         import mapillary_source
 
         mapillary_source.run(config["mapillary"], publish_image)
+    elif source == "googlemaps":
+        import googlemaps_source
+
+        googlemaps_source.run(config["googlemaps"], publish_image)
     else:
-        raise SystemExit(f"[Producer] config.json の source が不明です: {source}（screen / mapillary）")
+        raise SystemExit(f"[Producer] config.json の source が不明です: {source}（screen / mapillary / googlemaps）")
 
 
 if __name__ == "__main__":
