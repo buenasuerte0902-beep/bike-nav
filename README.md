@@ -265,3 +265,20 @@ python server/app.py --tls --lan    # https://<LAN-IP>:8779 (スマホ実機テ�
   他エリアも生成できるが、`js/app.js`の`CITY`定数を変更する必要あり）
 - `nearestNode()`は全ノード総当たりの線形探索（都市規模なら実用上問題ない速さだが、
   複数都市を1グラフに束ねる場合は空間インデックスが必要になる）
+
+## CycleVision.exe（取り込み＆推論パイプライン）
+
+`main_runner.py` を GitHub Actions（`.github/workflows/build-exe.yml`）で単一の Windows exe にしたもの。
+初回起動で exe の横に `config.json` が作られ、`source` で画像の取り込み元を選ぶ。
+
+- `"screen"`（既定）: 画面キャプチャ。`screen.auto` が false ならホットキー（既定 `ctrl+space`）を押した時だけ撮る
+- `"mapillary"`: `mapillary.bbox` の範囲の Mapillary 公開画像を取り込む（`mapillary.access_token` に Client Token を設定）
+- `"googlemaps"`: Edge（または Chrome）を自動で起動し、`googlemaps.route` の折れ線を `step_m` ごとに区切って
+  Google マップの Street View を開き、進行方向（`headings` で向きを追加可）のスクショを撮る
+
+推論結果は `output/results.csv` と `output/results.db`（SQLite, `results` テーブル）の両方に追記され、
+Mapillary 画像は緯度経度も記録される。処理済みの画像と付随情報（.json）は `processed_images/` へ移る。
+**`"googlemaps"` は Google マップ利用規約（3.3 大量ダウンロードの禁止、3.4 地図・ナビ用データセットの作成禁止）に
+当たる使い方で、Google アカウントや IP の利用制限を受けるおそれがある。** 利用者の判断で明示的に選んだ時だけ動き、
+既定（`"screen"`）では使われない。上の「手動ラベリング」節の方針（Street View 画像の自動取得・保存はしない）とは
+異なる取り込み元なので、得たデータを公開・商用利用する前に必ず規約を確認すること。

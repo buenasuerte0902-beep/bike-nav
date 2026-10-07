@@ -3,5 +3,5 @@ keyboard
 watchdog
 torch
 torchvision
-pandas
 pillow
+selenium
