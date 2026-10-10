@@ -8,6 +8,7 @@ const HIGHWAY_ALLOW = "primary|secondary|tertiary|unclassified|residential|livin
 const SEGMENT_TARGET_M = 500;
 const SEGMENT_MAX_M = 650;
 const SIGNAL_NEAR_M = 25;
+const SIGNAL_ROUTE_M = 30; // ナビ表示用: ルートからこの距離内の信号を出す
 const DEM_URL = (z, x, y) => `https://cyberjapandata.gsi.go.jp/xyz/dem_png/${z}/${x}/${y}.png`;
 const DEM_MAX_TILES = 90;
 
@@ -54,6 +55,45 @@ async function overpass(query, signal) {
     }
   }
   throw new Error(last || "道路データを取得できませんでした。通信状況を確認してください");
+}
+
+/**
+ * ルート(points: [[lat,lon],...])沿いの信号機をOSMから取得する。
+ * 戻り値: [{lat, lon, name|null}]。名前は name タグ(無ければ name:ja)。
+ */
+export async function fetchRouteSignals(points, signal) {
+  if (!points.length) return [];
+  let s = Infinity, w = Infinity, n = -Infinity, e = -Infinity;
+  for (const [la, lo] of points) {
+    s = Math.min(s, la); n = Math.max(n, la);
+    w = Math.min(w, lo); e = Math.max(e, lo);
+  }
+  const pad = 0.0004;
+  const q = `[out:json][timeout:60];
+node["highway"="traffic_signals"](${s - pad},${w - pad},${n + pad},${e + pad});
+out body qt;`;
+  const osm = await overpass(q, signal);
+  // 間引いたルート点との距離で絞る(ルートから離れた信号は除外)
+  const step = Math.max(1, Math.floor(points.length / 4000));
+  const sample = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+  const cell = 0.002;
+  const grid = new Map();
+  for (const p of sample) {
+    const k = `${Math.round(p[0] / cell)},${Math.round(p[1] / cell)}`;
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(p);
+  }
+  const out = [];
+  for (const el of osm.elements) {
+    if (el.type !== "node") continue;
+    const cx = Math.round(el.lat / cell), cy = Math.round(el.lon / cell);
+    let near = false;
+    for (let a = -1; a <= 1 && !near; a++)
+      for (let b = -1; b <= 1 && !near; b++)
+        near = (grid.get(`${cx + a},${cy + b}`) || []).some((p) => haversine(el.lat, el.lon, p[0], p[1]) <= SIGNAL_ROUTE_M);
+    if (near) out.push({ lat: el.lat, lon: el.lon, name: el.tags?.name || el.tags?.["name:ja"] || null });
+  }
+  return out;
 }
 
 // ---------- 標高(国土地理院 標高タイル dem_png) ----------

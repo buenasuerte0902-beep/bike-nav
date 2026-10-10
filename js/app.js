@@ -1,6 +1,6 @@
 // app.js — 画面の結線。検索・出発地/目的地・候補ルート・ナビ(案内)・GPXインポート。
 import { loadGraph, loadCityIndex, buildAdjacency, snapToRoad, haversine } from "./graph.js";
-import { buildAreaGraph, corridor, pointInPoly, MAX_STRAIGHT_KM } from "./osmgraph.js";
+import { buildAreaGraph, fetchRouteSignals, corridor, pointInPoly, MAX_STRAIGHT_KM } from "./osmgraph.js";
 import { findRoute, scoreToGrade, MODE_LABEL } from "./route.js";
 import { searchPlace } from "./geocode.js";
 import { MapView } from "./map.js";
@@ -572,9 +572,18 @@ function startNav(kind, obj, route) {
   els.navTime.textContent = "-";
   els.navMeta.textContent = "";
   els.navArrow.style.transform = "rotate(0deg)";
+  loadNavSignals(state.nav, kind === "app" ? route.polyline : obj.points);
   startLocWatch();
   requestWakeLock();
   if (state.me && Date.now() - state.me.t < 30000) updateNav(state.me.lat, state.me.lon, state.me.accuracy);
+}
+
+/** ナビ中、ルート沿いの信号機をマーク表示する(名前があれば上にラベル)。失敗しても案内は続ける */
+async function loadNavSignals(n, points) {
+  try {
+    const signals = await fetchRouteSignals(points);
+    if (state.nav === n) mapView.showSignals(signals);
+  } catch {}
 }
 
 function updateNav(lat, lon, accuracy) {
@@ -647,6 +656,7 @@ async function onOffRoute(n, lat, lon) {
   n.idx = 0;
   n.offCount = 0;
   mapView.showRoutes([route], 0);
+  loadNavSignals(n, route.polyline);
   toast("ルートを再検索しました");
 }
 
@@ -663,6 +673,7 @@ function arrive() {
 
 function endNav() {
   state.nav = null;
+  mapView.clearSignals();
   document.body.classList.remove("navigating");
   els.navBanner.hidden = true;
   els.navBar.hidden = true;

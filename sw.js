@@ -1,6 +1,6 @@
 // sw.js — オフライン対応。アプリ本体は precache、地図タイルは runtime cache、
 // 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（起動のたびに裏で更新確認）。
-const VERSION = "bike-nav-v7";
+const VERSION = "bike-nav-v8";
 const SHELL = `${VERSION}-shell`;
 // タイルと道路グラフは容量が大きいのでバージョンを上げても消さない
 const TILES = "bike-nav-tiles";

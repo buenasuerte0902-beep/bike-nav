@@ -205,6 +205,22 @@ body.navigating #searchBar { display: none; }
 }
 @keyframes pulse { 70% { box-shadow: 0 0 0 14px rgba(66,133,244,0), 0 1px 4px rgba(0,0,0,.4); } 100% { box-shadow: 0 0 0 0 rgba(66,133,244,0), 0 1px 4px rgba(0,0,0,.4); } }
 
+/* 信号機マーク(ナビ中)。名前があればマークの上にラベル */
+.sig-mark { position: relative; width: 18px; height: 30px; }
+.sig-icon {
+  display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  width: 16px; height: 28px; padding: 3px 0; box-sizing: border-box; background: #3c4043;
+  border: 1.5px solid #fff; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.45);
+}
+.sig-icon i { width: 6px; height: 6px; border-radius: 50%; background: #d93025; }
+.sig-icon i:nth-child(2) { background: #fbbc04; }
+.sig-icon i:nth-child(3) { background: #1e8e3e; }
+.sig-name {
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 2px;
+  white-space: nowrap; font-size: 12px; font-weight: 700; color: #202124; line-height: 1.2;
+  background: rgba(255,255,255,.92); border-radius: 4px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+
 /* ズームボタンは検索バーの下(タッチ端末はピンチで操作できるので非表示) */
 .leaflet-top.leaflet-right { margin-top: 68px; }
 @media (pointer: coarse) { .leaflet-control-zoom { display: none; } }

@@ -19,6 +19,7 @@ export class MapView {
 
     this.routeLayer = L.layerGroup().addTo(this.map);
     this.markerLayer = L.layerGroup().addTo(this.map);
+    this.signalLayer = L.layerGroup().addTo(this.map);
     this.meMarker = null;
     this.meAccuracy = null;
     this._originMarker = null;
@@ -58,6 +59,26 @@ export class MapView {
   clearDestination() {
     this._destMarker?.remove();
     this._destMarker = null;
+  }
+
+  /** 信号機マークを描く。名前データがあるものはマークの上に名前を出す */
+  showSignals(signals) {
+    this.signalLayer.clearLayers();
+    for (const s of signals) {
+      const named = !!s.name;
+      const html = `<div class="sig-mark${named ? " named" : ""}">${
+        named ? `<span class="sig-name">${escapeHtml(s.name)}</span>` : ""
+      }<span class="sig-icon"><i></i><i></i><i></i></span></div>`;
+      L.marker([s.lat, s.lon], {
+        icon: L.divIcon({ className: "", html, iconSize: [18, 30], iconAnchor: [9, 15] }),
+        interactive: false,
+        keyboard: false,
+        zIndexOffset: named ? 300 : 200,
+      }).addTo(this.signalLayer);
+    }
+  }
+  clearSignals() {
+    this.signalLayer.clearLayers();
   }
 
   clearRoute() {
@@ -140,4 +161,8 @@ export class MapView {
     this.map.stop();
     this.map.setView([lat, lon], zoom ?? this.map.getZoom(), { animate });
   }
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
