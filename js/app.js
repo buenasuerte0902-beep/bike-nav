@@ -5,6 +5,7 @@ import { findRoute, scoreToGrade, MODE_LABEL } from "./route.js";
 import { searchPlace } from "./geocode.js";
 import { MapView } from "./map.js";
 import { parseGpx, totalDistanceM, elevationGainM } from "./gpx.js";
+import { APP_VERSION } from "./version.js";
 import { buildNav, locate, describeTurn, formatDistance, formatDuration, formatClock } from "./nav.js";
 
 const DEFAULT_CENTER = [36.5613, 136.6562];
@@ -801,4 +802,5 @@ const ABOUT_HTML = `
     <li>路肩幅の推定: 国土地理院の空中写真、Mapillaryの街路写真をオフラインで解析(金沢市)</li>
     <li>標高: 国土地理院 標高タイル</li>
   </ul>
-  <p>ランクは推定を含みます。実際の道路状況・交通ルールを優先し、安全に走行してください。</p>`;
+  <p>ランクは推定を含みます。実際の道路状況・交通ルールを優先し、安全に走行してください。</p>
+  <p class="app-version">バージョン ${APP_VERSION}</p>`;

@@ -69,10 +69,18 @@ export async function fetchRouteSignals(points, signal) {
     w = Math.min(w, lo); e = Math.max(e, lo);
   }
   const pad = 0.0004;
-  const q = `[out:json][timeout:60];
-node["highway"="traffic_signals"](${s - pad},${w - pad},${n + pad},${e + pad});
+  s -= pad; w -= pad; n += pad; e += pad;
+  // 全国分の事前取得データ(data/signals/)があればそれを使い、無ければ Overpass に問い合わせる
+  let cands = await localSignals(s, w, n, e, signal);
+  if (!cands) {
+    const q = `[out:json][timeout:60];
+node["highway"="traffic_signals"](${s},${w},${n},${e});
 out body qt;`;
-  const osm = await overpass(q, signal);
+    const osm = await overpass(q, signal);
+    cands = osm.elements
+      .filter((el) => el.type === "node")
+      .map((el) => ({ lat: el.lat, lon: el.lon, name: el.tags?.name || el.tags?.["name:ja"] || null }));
+  }
   // 間引いたルート点との距離で絞る(ルートから離れた信号は除外)
   const step = Math.max(1, Math.floor(points.length / 4000));
   const sample = points.filter((_, i) => i % step === 0 || i === points.length - 1);
@@ -83,15 +91,33 @@ out body qt;`;
     if (!grid.has(k)) grid.set(k, []);
     grid.get(k).push(p);
   }
+  return cands.filter((c) => {
+    const cx = Math.round(c.lat / cell), cy = Math.round(c.lon / cell);
+    for (let a = -1; a <= 1; a++)
+      for (let b = -1; b <= 1; b++)
+        if ((grid.get(`${cx + a},${cy + b}`) || []).some((p) => haversine(c.lat, c.lon, p[0], p[1]) <= SIGNAL_ROUTE_M)) return true;
+    return false;
+  });
+}
+
+// 全国の信号機データ: data/signals/index.json (tools/fetch_signals.py が生成)。1度×1度のタイル単位で読む。
+let signalIndex; // Promise<Set<string>|null>
+async function localSignals(s, w, n, e, signal) {
+  signalIndex ??= fetch("data/signals/index.json")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => (j ? new Set(j.tiles) : null))
+    .catch(() => null);
+  const have = await signalIndex;
+  if (!have) return null;
   const out = [];
-  for (const el of osm.elements) {
-    if (el.type !== "node") continue;
-    const cx = Math.round(el.lat / cell), cy = Math.round(el.lon / cell);
-    let near = false;
-    for (let a = -1; a <= 1 && !near; a++)
-      for (let b = -1; b <= 1 && !near; b++)
-        near = (grid.get(`${cx + a},${cy + b}`) || []).some((p) => haversine(el.lat, el.lon, p[0], p[1]) <= SIGNAL_ROUTE_M);
-    if (near) out.push({ lat: el.lat, lon: el.lon, name: el.tags?.name || el.tags?.["name:ja"] || null });
+  for (let la = Math.floor(s); la <= Math.floor(n); la++) {
+    for (let lo = Math.floor(w); lo <= Math.floor(e); lo++) {
+      if (!have.has(`${la}_${lo}`)) continue; // 信号の無いタイルは省略されている
+      const res = await fetch(`data/signals/${la}_${lo}.json`, { signal });
+      if (!res.ok) return null; // 取得できなければ Overpass へ
+      for (const [lat, lon, name] of await res.json())
+        if (lat >= s && lat <= n && lon >= w && lon <= e) out.push({ lat, lon, name: name || null });
+    }
   }
   return out;
 }

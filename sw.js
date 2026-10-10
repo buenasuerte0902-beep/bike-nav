@@ -1,6 +1,6 @@
 // sw.js — オフライン対応。アプリ本体は precache、地図タイルは runtime cache、
 // 道路グラフ(data/graph/)は初回アクセス時に自動キャッシュ（起動のたびに裏で更新確認）。
-const VERSION = "bike-nav-v8";
+const VERSION = "bike-nav-v9";
 const SHELL = `${VERSION}-shell`;
 // タイルと道路グラフは容量が大きいのでバージョンを上げても消さない
 const TILES = "bike-nav-tiles";
@@ -19,6 +19,7 @@ const APP_SHELL = [
   "js/map.js",
   "js/app.js",
   "js/gpx.js",
+  "js/version.js",
   "vendor/leaflet/leaflet.js",
   "vendor/leaflet/leaflet.css",
   "vendor/leaflet/images/marker-icon.png",
@@ -72,7 +73,7 @@ self.addEventListener("fetch", (e) => {
   }
 
   // 道路グラフ: キャッシュを即返し、裏で更新(次回起動から新データ)。無ければ取得して保存
-  if (url.origin === location.origin && url.pathname.includes("/data/graph/")) {
+  if (url.origin === location.origin && /\/data\/(graph|signals)\//.test(url.pathname)) {
     e.respondWith(
       (async () => {
         const cache = await caches.open(GRAPH);

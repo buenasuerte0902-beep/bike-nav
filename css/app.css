@@ -233,3 +233,4 @@ body.navigating #searchBar { display: none; }
   .fab, .toast { bottom: 24px; }
   .nav-banner { right: auto; width: 392px; }
 }
+.app-version { color: #5f6368; font-size: 12px; text-align: right; }
